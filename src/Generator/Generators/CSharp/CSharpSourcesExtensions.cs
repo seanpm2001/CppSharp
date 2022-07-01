@@ -63,6 +63,8 @@ namespace CppSharp.Generators.CSharp
             {
                 if (@class.Fields.Any(f => f.Type.IsDependent))
                 {
+                    gen.GenerateDeclarationCommon();
+
                     foreach (var parameter in @class.TemplateParameters)
                         gen.WriteLine($"var __{parameter.Name} = typeof({parameter.Name});");
 
@@ -99,6 +101,8 @@ namespace CppSharp.Generators.CSharp
         {
             if (@class != null && @class.IsDependent)
             {
+                gen.GenerateDeclarationCommon();
+
                 foreach (var parameter in @class.TemplateParameters)
                     gen.WriteLine($"var __{parameter.Name} = typeof({parameter.Name});");
 

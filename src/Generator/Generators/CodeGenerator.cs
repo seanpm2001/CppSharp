@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Web.Util;
@@ -86,19 +87,43 @@ namespace CppSharp.Generators
 
         #region Declaration generation
 
-        public virtual void GenerateDeclarationCommon(Declaration decl)
+        public virtual void GenerateDeclarationCommon(Declaration decl, 
+            [CallerMemberName] string callerName = "",
+            [CallerFilePath] string sourceFilePath = "", 
+            [CallerLineNumber] int sourceLineNumber = 0)
         {
             if (decl.Comment != null)
                 GenerateComment(decl.Comment);
 
-            GenerateDebug(decl);
+            GenerateDebug(decl, callerName, sourceFilePath, sourceLineNumber);
+        }
+        public virtual void GenerateDeclarationCommon(
+            [CallerMemberName] string callerName = "",
+            [CallerFilePath] string sourceFilePath = "",
+            [CallerLineNumber] int sourceLineNumber = 0)
+        {
+            GenerateDebug(null, callerName, sourceFilePath, sourceLineNumber);
         }
 
-        public virtual void GenerateDebug(Declaration decl)
+        public virtual void GenerateDebug(Declaration decl, string callerName, string sourceFilePath, int sourceLineNumber)
         {
-            if (Options.GenerateDebugOutput && !string.IsNullOrWhiteSpace(decl.DebugText))
-                foreach (var line in Regex.Split(decl.DebugText.Trim(), "\r?\n"))
-                    WriteLine($"// DEBUG: {line}");
+            if (Options.GenerateDebugOutput && (decl == null || !string.IsNullOrWhiteSpace(decl.DebugText)))
+            {
+                WriteLine($"// <see href=\"file://{sourceFilePath.Replace('\\', '/')}\" /> at line {sourceLineNumber}");
+
+                if (decl != null)
+                    WriteLine($"// {callerName}: {decl.Name}");
+                else
+                    WriteLine($"// {callerName}");
+
+                if (decl != null)
+                {
+                    WriteLine($"// <code>");
+                    foreach (var line in Regex.Split(decl.DebugText.Trim(), "\r?\n"))
+                        WriteLine($"// {line}");
+                    WriteLine($"// </code>");
+                }
+            }
         }
 
         #endregion

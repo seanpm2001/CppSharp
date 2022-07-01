@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
 using CppSharp.AST;
 using CppSharp.AST.Extensions;
@@ -624,8 +625,9 @@ namespace CppSharp
             WriteLine("using System.Collections.Generic;");
         }
 
-        public override void GenerateDeclarationCommon(Declaration decl)
+        public override void GenerateDeclarationCommon(Declaration decl, [CallerMemberName] string callerName = "", [CallerFilePath] string sourceFilePath = "", [CallerLineNumber] int sourceLineNumber = 0)
         {
+            base.GenerateDeclarationCommon(decl, callerName, sourceFilePath, sourceLineNumber);
         }
 
         public override void GenerateNamespaceFunctionsAndVariables(

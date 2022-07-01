@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Security.Permissions;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -353,9 +354,12 @@ namespace CppSharp.Generators.CSharp
                 specializedClasses.First()};
         }
 
-        public override void GenerateDeclarationCommon(Declaration decl)
+        public override void GenerateDeclarationCommon(Declaration decl,
+            [CallerMemberName] string callerName = "",
+            [CallerFilePath] string sourceFilePath = "",
+            [CallerLineNumber] int sourceLineNumber = 0)
         {
-            base.GenerateDeclarationCommon(decl);
+            base.GenerateDeclarationCommon(decl, callerName, sourceFilePath, sourceLineNumber);
 
             foreach (Attribute attribute in decl.Attributes)
                 WriteLine("[global::{0}({1})]", attribute.Type.FullName, attribute.Value);
@@ -440,7 +444,10 @@ namespace CppSharp.Generators.CSharp
 
                     var generateNativeToManaged = Options.GenerateNativeToManagedFor(@class);
                     if (generateNativeToManaged)
+                    {
+                        GenerateDeclarationCommon();
                         WriteLine("internal static readonly {0} NativeToManagedMap = new {0}();", dict);
+                    }
                     PopBlock(NewLineKind.BeforeNextBlock);
 
                     // Create a method to record/recover a mapping to make it easier to call from template instantiation
@@ -452,30 +459,38 @@ namespace CppSharp.Generators.CSharp
                     { 
                         if (Options.GenerateFinalizerFor(@class))
                         {
+                            GenerateDeclarationCommon();
                             WriteLines($@"
-    internal static void {Helpers.RecordNativeToManagedMappingIdentifier}(IntPtr native, {printedClass} managed)
-    {{
-        NativeToManagedMap[native] = new global::System.WeakReference<{printedClass}>(managed);
-    }}
+internal static void {Helpers.RecordNativeToManagedMappingIdentifier}(IntPtr native, {printedClass} managed)
+{{
+    NativeToManagedMap[native] = new global::System.WeakReference<{printedClass}>(managed);
+}}
+");
 
-    internal static bool {Helpers.TryGetNativeToManagedMappingIdentifier}(IntPtr native, out {printedClass} managed)
-    {{
-        managed = default;
-        return NativeToManagedMap.TryGetValue(native, out var wr) && wr.TryGetTarget(out managed);
-    }}");
+                            GenerateDeclarationCommon();
+                            WriteLines($@"
+internal static bool {Helpers.TryGetNativeToManagedMappingIdentifier}(IntPtr native, out {printedClass} managed)
+{{
+    managed = default;
+    return NativeToManagedMap.TryGetValue(native, out var wr) && wr.TryGetTarget(out managed);
+}}");
                         }
                         else
                         {
+                            GenerateDeclarationCommon();
                             WriteLines($@"
-    internal static void {Helpers.RecordNativeToManagedMappingIdentifier}(IntPtr native, {printedClass} managed)
-    {{
-        NativeToManagedMap[native] = managed;
-    }}
+internal static void {Helpers.RecordNativeToManagedMappingIdentifier}(IntPtr native, {printedClass} managed)
+{{
+    NativeToManagedMap[native] = managed;
+}}
+");
 
-    internal static bool {Helpers.TryGetNativeToManagedMappingIdentifier}(IntPtr native, out {printedClass} managed)
-    {{
-        return NativeToManagedMap.TryGetValue(native, out managed);
-    }}");
+                            GenerateDeclarationCommon();
+                            WriteLines($@"
+internal static bool {Helpers.TryGetNativeToManagedMappingIdentifier}(IntPtr native, out {printedClass} managed)
+{{
+    return NativeToManagedMap.TryGetValue(native, out managed);
+}}");
                         }
                     }
                 }
@@ -492,6 +507,11 @@ namespace CppSharp.Generators.CSharp
 
             GenerateClassMethods(@class.Methods);
             GenerateClassVariables(@class);
+
+            if (@class.Name.Contains("Hiiiii"))
+            {
+                System.Console.WriteLine("");
+            }
             GenerateClassProperties(@class);
 
             if (@class.IsDynamic)
@@ -578,6 +598,7 @@ namespace CppSharp.Generators.CSharp
             var sequentialLayout = Options.GenerateSequentialLayout && CanUseSequentialLayout(@class);
 
             PushBlock(BlockKind.InternalsClass);
+            GenerateDeclarationCommon();
 
             if (@class.Layout.Size > 0)
             {
@@ -610,6 +631,8 @@ namespace CppSharp.Generators.CSharp
         private IEnumerable<Function> GatherClassInternalFunctions(Class @class,
             bool includeCtors = true)
         {
+            GenerateDeclarationCommon();
+
             var functions = new List<Function>();
             if (@class.IsValueType)
                 foreach (var @base in @class.Bases.Where(b => b.IsClass && !b.Class.Ignore))
@@ -853,6 +876,8 @@ namespace CppSharp.Generators.CSharp
         private void GenerateClassInternalsFields(Class @class, bool sequentialLayout)
         {
             var fields = @class.Layout.Fields;
+            if (fields.Any())
+                GenerateDeclarationCommon();
 
             for (var i = 0; i < fields.Count; ++i)
             {
@@ -907,6 +932,7 @@ namespace CppSharp.Generators.CSharp
             where T : Declaration, ITypedDecl
         {
             PushBlock(BlockKind.Method);
+            GenerateDeclarationCommon(decl);
             Write("set");
 
             if (decl is Function)
@@ -1254,6 +1280,7 @@ namespace CppSharp.Generators.CSharp
             where T : Declaration, ITypedDecl
         {
             PushBlock(BlockKind.Method);
+            GenerateDeclarationCommon(decl);
             Write("get");
 
             if (property != null && property.GetMethod != null &&
@@ -1564,6 +1591,7 @@ namespace CppSharp.Generators.CSharp
                 }
 
                 PushBlock(BlockKind.Property);
+                GenerateDeclarationCommon();
 
                 ArrayType arrayType = prop.Type as ArrayType;
                 if (arrayType != null && arrayType.Type.IsPointerToPrimitiveType() && prop.Field != null)
@@ -1700,6 +1728,7 @@ namespace CppSharp.Generators.CSharp
 
             PushBlock(BlockKind.Region);
             WriteLine("#region Virtual table interop");
+            GenerateDeclarationCommon();
             NewLine();
 
             // Generate a delegate type for each method.
@@ -1919,6 +1948,7 @@ namespace CppSharp.Generators.CSharp
         {
             if (method.IsDestructor)
             {
+                GenerateDeclarationCommon();
                 WriteLine("{0}.Dispose(disposing: true, callNativeDtor: true);", Helpers.TargetIdentifier);
                 return;
             }
@@ -2251,6 +2281,7 @@ namespace CppSharp.Generators.CSharp
             // Generate the IDispose Dispose() method.
             if (!hasBaseClass)
             {
+                GenerateDeclarationCommon();
                 using (PushWriteBlock(BlockKind.Method, "public void Dispose()", NewLineKind.BeforeNextBlock))
                 {
                     WriteLine($"Dispose(disposing: true, callNativeDtor : { Helpers.OwnsNativeInstanceIdentifier} );");
@@ -2262,10 +2293,12 @@ namespace CppSharp.Generators.CSharp
             // Declare partial method that the partial class can implement to participate
             // in dispose.
             PushBlock(BlockKind.Method);
+            GenerateDeclarationCommon();
             WriteLine("partial void DisposePartial(bool disposing);");
             PopBlock(NewLineKind.BeforeNextBlock);
 
             // Generate Dispose(bool, bool) method
+            GenerateDeclarationCommon();
             var ext = !@class.IsValueType ? (hasBaseClass ? "override " : "virtual ") : string.Empty;
             using var _ = PushWriteBlock(BlockKind.Method, $"internal protected {ext}void Dispose(bool disposing, bool callNativeDtor )", NewLineKind.BeforeNextBlock);
 
@@ -2384,6 +2417,7 @@ namespace CppSharp.Generators.CSharp
             if (@class.IsRefType && shouldGenerateClassNativeField)
             {
                 PushBlock(BlockKind.Field);
+                GenerateDeclarationCommon();
                 WriteLine("protected bool {0};", Helpers.OwnsNativeInstanceIdentifier);
                 PopBlock(NewLineKind.BeforeNextBlock);
             }
@@ -2391,6 +2425,7 @@ namespace CppSharp.Generators.CSharp
             if (!@class.IsAbstractImpl)
             {
                 PushBlock(BlockKind.Method);
+                GenerateDeclarationCommon();
                 TypePrinterResult printedClass = @class.Visit(TypePrinter);
                 printedClass.RemoveNamespace();
 
@@ -2410,7 +2445,8 @@ namespace CppSharp.Generators.CSharp
 
                     bool generateNativeToManaged = Options.GenerateNativeToManagedFor(@class);
                     if (generateNativeToManaged)
-                    { 
+                    {
+                        GenerateDeclarationCommon();
                         WriteLines($@"
 internal static{(@new ? " new" : string.Empty)} {printedClass} __GetOrCreateInstance({TypePrinter.IntPtrType} native, bool saveInstance = false, bool skipVTables = false)
 {{
@@ -2430,6 +2466,7 @@ internal static{(@new ? " new" : string.Empty)} {printedClass} __GetOrCreateInst
                     {
                         @new = @class.HasBase && HasVirtualTables(@class.Bases.First().Class);
 
+                        GenerateDeclarationCommon();
                         WriteLines($@"
 internal static{(@new ? " new" : string.Empty)} {printedClass} __GetInstance({TypePrinter.IntPtrType} native)
 {{");
@@ -2455,6 +2492,7 @@ WriteLines($@"
             this.GenerateNativeConstructorsByValue(@class);
 
             PushBlock(BlockKind.Method);
+            GenerateDeclarationCommon();
             WriteLine("{0} {1}(void* native, bool skipVTables = false){2}",
                 @class.IsAbstractImpl ? "internal" : (@class.IsRefType ? "protected" : "private"),
                 @class.Name, @class.IsValueType ? " : this()" : string.Empty);
@@ -2508,6 +2546,7 @@ WriteLines($@"
             {
                 returnType.RemoveNamespace();
                 PushBlock(BlockKind.Method);
+                GenerateDeclarationCommon();
                 WriteLine("internal static {0} {1}({2} native, bool skipVTables = false)",
                     returnType, Helpers.CreateInstanceIdentifier, @internal);
                 WriteOpenBraceAndIndent();
@@ -2520,6 +2559,7 @@ WriteLines($@"
             if (@class.IsRefType && !@class.IsAbstract)
             {
                 PushBlock(BlockKind.Method);
+                GenerateDeclarationCommon();
                 WriteLine($"private static void* __CopyValue({@internal} native)");
                 WriteOpenBraceAndIndent();
                 var copyCtorMethod = @class.Methods.FirstOrDefault(method =>
@@ -2550,6 +2590,7 @@ WriteLines($@"
             if (!@class.IsAbstract)
             {
                 PushBlock(BlockKind.Method);
+                GenerateDeclarationCommon();
                 WriteLine("{0} {1}({2} native, bool skipVTables = false)",
                     @class.IsAbstractImpl ? "internal" : "private", @class.Name, @internal);
                 WriteLineIndent(@class.IsRefType ? ": this(__CopyValue(native), skipVTables)" : ": this()");
@@ -3369,13 +3410,12 @@ WriteLines($@"
             if (!typedef.IsGenerated)
                 return false;
 
-            GenerateDeclarationCommon(typedef);
-
             var functionType = typedef.Type as FunctionType;
 
             if (functionType != null || typedef.Type.IsPointerTo(out functionType))
             {
                 PushBlock(BlockKind.Typedef);
+                GenerateDeclarationCommon(typedef);
                 var attributedType = typedef.Type.GetPointee() as AttributedType;
                 var callingConvention = attributedType == null
                     ? functionType.CallingConvention
